@@ -15,6 +15,37 @@ LIMIT 10;
 
 -- 3. Which day of the week has most questions answered within an hour? --------->>>
 
+WITH AnsweredWithinHour AS (
+    SELECT
+        EXTRACT(DOW FROM p1.creationdate) AS day_of_week,
+        COUNT(*) AS answered_count
+    FROM
+        posts p1
+    JOIN
+        posts p2 ON p1.id = p2.parentid
+    WHERE
+        p2.posttypeid = 2
+        AND DATE_PART('hour', p2.creationdate - p1.creationdate) <= 1
+    GROUP BY
+        day_of_week
+)
+SELECT
+    CASE
+        WHEN day_of_week = 0 THEN 'Sunday'
+        WHEN day_of_week = 1 THEN 'Monday'
+        WHEN day_of_week = 2 THEN 'Tuesday'
+        WHEN day_of_week = 3 THEN 'Wednesday'
+        WHEN day_of_week = 4 THEN 'Thursday'
+        WHEN day_of_week = 5 THEN 'Friday'
+        WHEN day_of_week = 6 THEN 'Saturday'
+    END AS day_of_week,
+    answered_count
+FROM
+    AnsweredWithinHour
+ORDER BY
+    answered_count DESC
+LIMIT 1;
+
 
 -- 4. Find the top 10 posts with the most upvotes in 2015? --------->>>
 
