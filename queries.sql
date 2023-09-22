@@ -99,10 +99,20 @@ AND EXTRACT(YEAR FROM posts.CreationDate) = 2014;
 
 -- 8.When did arduino.stackexchange.com have the most usage? Has it declined in usage now? (somewhat open-ended 
 -- question. Use your own interpretation of the question) 
+-- Here we will count vote IF VoteTypeId is 
+-- 2 = UpMod (AKA upvote)
+-- 3 = DownMod (AKA downvote)
+-- 4 = Offensive
 
-select extract(year from posts.creationdate) as year , count (*) as PostCount from posts
-group by year
-order by postcount desc ;
+SELECT  EXTRACT( year from  posts.creationdate ) AS year,
+SUM( posts.viewcount + posts.answercount + posts.commentcount ) +
+COUNT(posts.id) +
+COUNT(votes.votetypeid)  AS most_usage 
+FROM posts  JOIN votes 
+ON posts.id = votes.postid
+WHERE votes.votetypeid IN (2,3,4)
+group by  year 
+order by most_usage desc;
 
 
 -- Find the top 5 users who have performed the most number of actions in terms of creating posts, comments, votes. Calculate the score in the following way:
@@ -110,23 +120,59 @@ order by postcount desc ;
 -- Each upvote / downvote carries 1 point
 -- Each comment carries 3 points
 
-WITH UserActions AS (
-    SELECT
-        u.id AS user_id,
-        (
-            COALESCE(SUM(CASE WHEN p.posttypeid = 1 THEN 10 ELSE 0 END), 0) +
-            COALESCE(SUM(CASE WHEN v.votetypeid IN (2, 3) THEN 1 ELSE 0 END), 0) +
-            COALESCE(SUM(CASE WHEN p.posttypeid = 2 THEN 3 ELSE 0 END), 0) +
-            COALESCE(SUM(CASE WHEN c.id IS NOT NULL THEN 3 ELSE 0 END), 0)
-        ) AS Score
-    FROM users u
-    LEFT JOIN posts p ON u.id = p.owneruserid
-    LEFT JOIN votes v ON p.id = v.postid
-    LEFT JOIN comments c ON u.id = c.userid
-    GROUP BY u.id
-)
+-- WITH UserActions AS (
+--     SELECT
+--         u.id AS user_id,
+--         (
+--             COALESCE(SUM(CASE WHEN p.posttypeid = 1 THEN 10 ELSE 0 END), 0) +
+--             COALESCE(SUM(CASE WHEN v.votetypeid IN (2, 3) THEN 1 ELSE 0 END), 0) +
+--             COALESCE(SUM(CASE WHEN p.posttypeid = 2 THEN 3 ELSE 0 END), 0) +
+--             COALESCE(SUM(CASE WHEN c.id IS NOT NULL THEN 3 ELSE 0 END), 0)
+--         ) AS Score
+--     FROM users u
+--     LEFT JOIN posts p ON u.id = p.owneruserid
+--     LEFT JOIN votes v ON p.id = v.postid
+--     LEFT JOIN comments c ON u.id = c.userid
+--     GROUP BY u.id
+-- )
 
-SELECT user_id, Score
-FROM UserActions
-ORDER BY Score DESC
+-- SELECT user_id, Score
+-- FROM UserActions
+-- ORDER BY Score DESC
+-- LIMIT 5;
+-- we will find each scores like post scores , comment scores , vote scores then we will add 
+WITH PostScores AS (
+    SELECT
+        p.owneruserid AS user_id,
+        COUNT(*) * 10 AS post_score
+    FROM posts p
+    WHERE p.posttypeid IN (1,2)
+    GROUP BY p.owneruserid 
+),
+VoteScores AS (
+    SELECT
+        p.owneruserid AS user_id,
+        COUNT(*) AS vote_score
+    FROM posts p
+    JOIN votes v ON p.id = v.postid
+    WHERE v.votetypeid IN (2, 3)
+    GROUP BY p.owneruserid
+),
+CommentScores AS (
+    SELECT
+        c.userid AS user_id,
+        COUNT(*) * 3 AS comment_score
+    FROM comments c
+    GROUP BY c.userid
+)
+SELECT 
+    u.id AS user_id, 
+	u.displayname AS name ,
+    COALESCE(post_score, 0) + COALESCE(vote_score, 0) + COALESCE(comment_score, 0) AS total_score
+FROM users u
+LEFT JOIN PostScores ps ON u.id = ps.user_id
+LEFT JOIN VoteScores vs ON u.id = vs.user_id
+LEFT JOIN CommentScores cs ON u.id = cs.user_id
+ORDER BY total_score DESC
 LIMIT 5;
+
