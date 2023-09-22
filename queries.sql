@@ -25,7 +25,10 @@ WITH AnsweredWithinHour AS (
         posts p2 ON p1.id = p2.parentid
     WHERE
         p2.posttypeid = 2
-        AND DATE_PART('hour', p2.creationdate - p1.creationdate) <= 1
+    AND DATE_PART('year', p2.creationdate - p1.creationdate) = 0
+    AND DATE_PART('month', p2.creationdate - p1.creationdate) = 0
+    AND DATE_PART('day', p2.creationdate - p1.creationdate) = 0
+    AND DATE_PART('hour', p2.creationdate - p1.creationdate) = 0
     GROUP BY
         day_of_week
 )
